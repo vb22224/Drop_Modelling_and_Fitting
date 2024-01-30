@@ -9,12 +9,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import Drop_Plotter as dp
 import Drop_Trace_Model as dtm
-import Continuous_Trace_Model as ctm
-from scipy.optimize import minimize
 
 
 
-def trace_plotter(time, total_trace, av_times, averaged_data, selfcharge_trace=[], precharge_trace=[], title=None):
+def trace_plotter(time, total_trace, av_times, averaged_data, selfcharge_trace=[], precharge_trace=[]):
     
     """ Function to plot various modelled and measured traces """
     
@@ -31,9 +29,6 @@ def trace_plotter(time, total_trace, av_times, averaged_data, selfcharge_trace=[
     plt.xlabel('Time / s')
     plt.ylabel('Charge / a.u. ')
     plt.legend()
-    
-    if title != None:
-        plt.title(title)
     
     plt.show()
     
@@ -63,8 +58,8 @@ def get_total_residual(time, total_trace, av_times, averaged_data, selfcharge_tr
     total_residual = 0
     
     if sync_trace == True:
-        for count, t in enumerate(total_trace):
-            if t != 0:
+        for count, d in enumerate(total_trace):
+            if d != 0:
                 av_times += time[int(count/2)] # tries to account for the "dead-time" in the predicted signal (may be better without this)
                 break
     
@@ -91,55 +86,12 @@ def get_total_residual(time, total_trace, av_times, averaged_data, selfcharge_tr
     
     
     
-def predict_trace(charge_multiplier, precharge_ratio, charge_freq_den, pre_charge_freq_den, self_integral, pre_integral, time_fit, sample_rate, trace_time):
-    
-    """ Predicts the expected traces at specified precharge ratio and charge multiplier """
-    
-    pre_charge_freq_den *= precharge_ratio * self_integral / pre_integral
-    time, selfcharge_trace = ctm.get_trace(charge_freq_den, time_fit, sample_rate, trace_time)
-    time, precharge_trace = ctm.get_trace(pre_charge_freq_den, time_fit, sample_rate, trace_time)
-    selfcharge_trace *= charge_multiplier
-    precharge_trace *= charge_multiplier
-    total_trace = selfcharge_trace + precharge_trace
-    
-    return time, selfcharge_trace, precharge_trace, total_trace
-    
-    
-    
-def objective_function(variables, x3, x4, x5, x6, x7, x8, x9, x10, x11):
-    
-    """ Used for the function minimisation with scipy.minimize """
-    
-    x1, x2 = variables[0], variables[1] # charge_multiplier, precharge_ratio
-    
-    result = function_to_minimize(x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11)
-      
-    return result
-
-        
-    
-def function_to_minimize(charge_multiplier, precharge_ratio, charge_freq_den, pre_charge_freq_den, self_integral, pre_integral, time_fit, sample_rate, trace_time, av_times, averaged_data):
-    
-    """ 
-    Function that calculates the trace and residuals from the predict_trace function
-    Then gets the total residual using get_total_residual
-    """
-    
-    time, selfcharge_trace, precharge_trace, total_trace = predict_trace(charge_multiplier, precharge_ratio, charge_freq_den, pre_charge_freq_den, self_integral, pre_integral, time_fit, sample_rate, trace_time)
-    total_residual, av_times, time, selfcharge_trace, precharge_trace, total_trace = get_total_residual(time, total_trace, av_times, averaged_data, selfcharge_trace, precharge_trace, crop=True)
-    trace_plotter(time, total_trace, av_times, averaged_data, selfcharge_trace, precharge_trace, title = f"cm: {round(charge_multiplier, 4)}, pr: {round(precharge_ratio, 4)}, tr: {round(total_residual, 0)}")
-    print(f"The total residual for this fit is: {round(total_residual, 1)} pC")
-    
-    return total_residual
-
-
-    
 if __name__ == "__main__":
     
     ###########################################################################
     # Parameters required for the Drop_Plotter
     
-    path = "..\\Drops\\StHelens_Fit"
+    path = "..\\Drops\\Grims_Fit"
     input_type = "dir" # Directory (dir), categorised (cat), list (lis), or list of lists (lol)
     # Note: the categroised (cat) input type requires filenames formatted such that the type is follwed by underscore then index e.g. Atitlan_1.txt
     plot_parameter = "Q" # Charge (Q) or voltage (V)
@@ -155,70 +107,48 @@ if __name__ == "__main__":
     trim = True # If True removes the begining of the trace such that all traces start at the same time (required to calulate average trace)
     manual_trim = {"Cu 1 mm_3.txt": 2.25, "Cu 1 mm_5.txt": 2.95, "Cu 1 mm_6.txt": 3, "Cu 1 mm_7.txt": 4} # Dictionary of file names and the time (in seconds) that you want to maually trim from the start
     store_dict, read_dict = False, False # Options to store or read from file the manual trim dictionary
-    data_col = 0 # Selects which column of data file to read (default is the first column = 0)
     
     file_names, lol_structure, lol_labels = dp.get_file_names(input_type, path, file_names_lis, file_names_lol, remove_files, lol_labels)
-    data, sample_rates, temperatures, humidities, filtered_names = dp.read_and_convert_data(file_names, path, plot_parameter, ignore_len_errors, trim, manual_trim, store_dict, read_dict, data_col)
+    data, sample_rates, temperatures, humidities = dp.read_and_convert_data(file_names, path, plot_parameter, ignore_len_errors, trim, manual_trim, store_dict, read_dict)
     time_step, times, time = dp.get_times(sample_rates, data)
     av_times, averaged_data = dp.plot_figure(data, times, time, input_type, plot_parameter, file_names, path, lol_structure, lol_labels, change_type, plot_option, plot_average, show=False, get_av_data=True)
     
     ###########################################################################
-    # Parameters required for the Continuous_Trace_Model
-
-    dp = np.logspace(np.log10(0.1), np.log10(100000), num=1000, base=10.0) # Evenly logspaced dp to veiw functions
+    # Parameters required for the Drop_Trace_Model
     
+    Np = 1000 # Number of Particles
+    target_cfl = 1 # Ideally 1
     drop_height = 0.3725 # Height of particle drop / m
     g = 9.81 # Acceleration due to gravity in m s^-2
-    p_p, p_f = 1500, 1.23 # Density of particle and fluid in kg m^-3 (around 2000 for ash and 8940 for Cu)
+    p_p, p_f = 2000, 1.23 # Density of particle and fluid in kg m^-3 (around 2000 for ash and 8940 for Cu)
     mu = 1.79E-5 # Viscosity of the fluid (air) in Pa s
-    cfl = 1.0 # Taget CFL, ajust if numerical instabilities are encountered
-    trace_time = 10 # The time the trace is recorded for, allows the small particles where there is numerical instability to be cut off
-    adjust_min_t = 1 # Parameter can be used to change the minimum timestep (default = 1)
-    sample_rate = sample_rates[0] / 100 # Can devide this by less (or 1) to increse accracy but also time to compute
-    initial_guess = [0.8, 40] # Charge multiplier and precharge ratio initial guesses
-    
-    # Size Fit
+    precharge_ratio = 0.08 # Ratio of total pre-charging to self-charging
+    charge_multiplier = -0.2 # Multiplies the entire fit, including both pre- and self-charging
     dist_type="trimodal"
-    mode_sizes = 1.120327905, 3.429079214, 8.5692211 # relative sizes of modes
-    mode_means = 0.678318856, 4.487975814, 65.50575473 # means od modes / um
-    mode_stds = 0.188473207, 0.517128972, 0.582954424 # modes standard distributions (logspace)
-
-    # Charge Fit
-    a, b, c = 0.0000422872092695638, 1.92919997077313, -2.71413437499992
+    a, b = 0.000114973831461661, -1.42331251163934
     
-    total_size = ctm.check_modes(mode_sizes, mode_means, mode_stds)
-    frequency_density, charge_fit = [], []
+    # Monomodal
+    dist_mean, dist_sd = 30, 0.2 # Mean in umand standard distribution from the lognormal particle distribution (typical would be 30, 0.2)
     
-    for d in dp:
-        frequency_density.append(ctm.calc_size_freq(d, mode_sizes, mode_means, mode_stds, total_size))
-        charge_fit.append(ctm.calc_charge(d, a, b, c))
+    # Trimodal
+    mode_sizes = 0.008379052, 0.635798575, 6.150637405 # relative sizes of modes
+    mode_means = 0.828113968, 32.99460371, 96.6914689 # means od modes / um
+    mode_stds = 0.083381234, 0.348839354, 0.226022998 # modes standard distributions (logspace)
     
-    frequency_density = np.array(frequency_density)
-    charge_fit = np.array(charge_fit)
+    size_array, Np = dtm.generate_size(Np, dist_mean, dist_sd, mode_sizes, mode_means, mode_stds, dist_type=dist_type) # Generates particle sizes / um
+    time_array = dtm.array_drop_time(size_array, target_cfl=target_cfl, drop_height=drop_height, p_p=p_p)
+    charge_array = dtm.array_charge_fit(size_array, a, b, a_scatt=0.0002, b_scatt=0.3) # Typical vaues: a_scatt=0.0002, b_scatt=0.3
+    charge_array = dtm.normalise_charge(charge_array, size_array)
+    selfcharge_trace, precharge_trace, total_trace, time = dtm.get_trace(time_array, charge_array, size_array, charge_multiplier, precharge_ratio, time_length=10, step = 0.1, plot=False, return_components=True)
     
-    charge_freq_den = frequency_density * charge_fit
-    pre_charge_freq_den = frequency_density * (dp / 100) ** 2 # Prechareg scaling with SA
-    self_integral = ctm.trap_int(np.arange(len(dp)), charge_freq_den, 0, len(dp))
-    pre_integral = ctm.trap_int(np.arange(len(dp)), pre_charge_freq_den, 0, len(dp))
-    time_fit = ctm.get_time_fit(dp, drop_height, p_p, p_f, g, mu, cfl, adjust_min_t, trace_time)
-    
-    # charge_multiplier, precharge_ratio = initial_guess[0], initial_guess[1]
-    # time, selfcharge_trace, precharge_trace, total_trace = predict_trace(charge_multiplier, precharge_ratio, charge_freq_den, pre_charge_freq_den, self_integral, pre_integral, time_fit, sample_rate, trace_time)
-    # total_residual, av_times, time, selfcharge_trace, precharge_trace, total_trace = get_total_residual(time, total_trace, av_times, averaged_data, selfcharge_trace, precharge_trace, crop=True)
-    # trace_plotter(time, total_trace, av_times, averaged_data, selfcharge_trace, precharge_trace)
     ###########################################################################
-    # Fit
+    # Combined
     
-    result = minimize(objective_function, initial_guess, method=None, args=(charge_freq_den, pre_charge_freq_den, self_integral, pre_integral, time_fit, sample_rate, trace_time, av_times, averaged_data))
-    charge_multiplier, precharge_ratio = result.x[0], result.x[1]
-    # charge_multiplier, precharge_ratio = -0.91536396526753179, 0
-    
-    print(f"Charge multiplier: {charge_multiplier}, precharge_ratio: {precharge_ratio}")
-    
-    time, selfcharge_trace, precharge_trace, total_trace = predict_trace(charge_multiplier, precharge_ratio, charge_freq_den, pre_charge_freq_den, self_integral, pre_integral, time_fit, sample_rate, trace_time)
     total_residual, av_times, time, selfcharge_trace, precharge_trace, total_trace = get_total_residual(time, total_trace, av_times, averaged_data, selfcharge_trace, precharge_trace, crop=True)
-    trace_plotter(time, total_trace, av_times, averaged_data, selfcharge_trace, precharge_trace, title=None)
-
+    trace_plotter(time, total_trace, av_times, averaged_data, selfcharge_trace, precharge_trace)
+    print(f"The total residual for this fit is: {round(total_residual, 1)} pC")
+    
+    
     ###########################################################################
     # Section for ring probe
     

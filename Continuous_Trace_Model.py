@@ -265,10 +265,11 @@ if __name__ == "__main__":
     ###########################################################################
     # Size Fit
     
+    # Size Fit
     dist_type="trimodal"
-    mode_sizes = 0.0217775611128209, 0.778806870226694, 5.95140876936293 # relative sizes of modes
-    mode_means = 0.719588856304199, 12.2012512193786, 141.272414183094 # means od modes / um
-    mode_stds = 0.0756046451662065, 0.446142546327532, 0.445809826247974 # modes standard distributions (logspace)
+    mode_sizes = 1.120327905, 3.429079214, 8.5692211 # relative sizes of modes
+    mode_means = 0.678318856, 4.487975814, 65.50575473 # means od modes / um
+    mode_stds = 0.188473207, 0.517128972, 0.582954424 # modes standard distributions (logspace)
     
     total_size = check_modes(mode_sizes, mode_means, mode_stds)
     frequency_density = []
@@ -282,7 +283,7 @@ if __name__ == "__main__":
     ###########################################################################
     # Charge Fit
 
-    a, b, c = 0.0000242150172948039, 2, -2.61379994963604
+    a, b, c = 0.0000422872092695638, 1.92919997077313, -2.71413437499992
     
     charge_fit = []
     
@@ -295,14 +296,14 @@ if __name__ == "__main__":
     ###########################################################################
     # Charge Frequency Density Fit
     
-    precharge_ratio = 1 # Ratio of total pre-charging to self-charging
+    precharge_ratio = 10 # Ratio of total pre-charging to self-charging
     
     charge_freq_den = frequency_density * charge_fit
     pre_charge_freq_den = frequency_density * (dp / 100) ** 2 # Prechareg scaling with SA
     self_integral = trap_int(np.arange(len(dp)), charge_freq_den, 0, len(dp))
     pre_integral = trap_int(np.arange(len(dp)), pre_charge_freq_den, 0, len(dp))
     pre_charge_freq_den *= precharge_ratio * self_integral / pre_integral
-    
+
     # integration_check(dp, charge_freq_den)
     # plot_size(dp, charge_freq_den, "Charge Frequency Density / a.u.",  log=True)
     # plot_size(dp, pre_charge_freq_den, "Charge Frequency Density / a.u.",  log=True)
@@ -315,7 +316,7 @@ if __name__ == "__main__":
     p_p, p_f = 2000, 1.23 # Density of particle and fluid in kg m^-3 (around 2000 for ash and 8940 for Cu)
     mu = 1.79E-5 # Viscosity of the fluid (air) in Pa s
     cfl = 1.0 # Taget CFL, ajust if numerical instabilities are encountered
-    trace_time = 10 # The time the trace is recorded for, allows the small particles where there is numerical instability to be cut off
+    trace_time = 5.8 # The time the trace is recorded for, allows the small particles where there is numerical instability to be cut off
     adjust_min_t = 1 # Parameter can be used to change the minimum timestep (default = 1)
 
     time_fit = get_time_fit(dp, drop_height, p_p, p_f, g, mu, cfl, adjust_min_t, trace_time)
@@ -325,8 +326,8 @@ if __name__ == "__main__":
     # Trace
 
     sample_rate = 10.0 # Sapmle rate in Hz
-    charge_multiplier = 1 # Multiplies the entire fit, including both pre- and self-charging
-
+    charge_multiplier = 1.1 # Multiplies the entire fit, including both pre- and self-charging
+    
     times, self_trace = get_trace(charge_freq_den, time_fit, sample_rate, trace_time)
     times, pre_trace = get_trace(pre_charge_freq_den, time_fit, sample_rate, trace_time)
     self_trace *= charge_multiplier
