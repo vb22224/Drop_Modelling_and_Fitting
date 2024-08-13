@@ -23,7 +23,7 @@ def linear_interp(x, x1, x2, y1, y2):
 
 
 
-def trap_int(x_array, y_array, x1, x2):
+def trap_int(x_array, y_array, x1=0, x2=float('inf')):
     
     """ Performs a numerical integration using the trapezium rule """
     
@@ -40,9 +40,9 @@ def trap_int(x_array, y_array, x1, x2):
 
 
 
-def integration_check(dp, charge_freq_den):
+def integration_check(dp, charge_freq_den, v=False):
     
-    """ Checks how close to zero the total integral of the charge frquency density is """
+    """ Checks how close to zero the total integral of the charge frquency density is and returns positive and negative sections """
     
     # Find the range where charge_freq_den is minimized to maximized
     min_index = np.argmin(charge_freq_den)
@@ -55,9 +55,10 @@ def integration_check(dp, charge_freq_den):
     neg_integral = trap_int(np.log10(dp), charge_freq_den, np.min(np.log10(dp)), midpoint)
     pos_integral = trap_int(np.log10(dp), charge_freq_den, midpoint, np.max(np.log10(dp)))
     
-    print(f'negative part: {round(neg_integral, 3)}, positive part: {round(pos_integral, 3)}, total integration: {round(pos_integral + neg_integral, 3)}')
+    if v == True:
+        print(f'negative part: {round(neg_integral, 3)}, positive part: {round(pos_integral, 3)}, total integration: {round(pos_integral + neg_integral, 3)}')
     
-    return
+    return neg_integral, pos_integral
 
 
 
@@ -77,7 +78,7 @@ def check_modes(mode_sizes, mode_means, mode_stds):
 
 
 
-def calc_size_freq(d, mode_sizes, mode_means, mode_stds, total_size):
+def calc_size_freq(d, mode_sizes, mode_means, mode_stds, total_size, truncate=float('inf')):
     
     """ Function to calulate the frequency denisity for a given particle size"""
     
@@ -86,17 +87,23 @@ def calc_size_freq(d, mode_sizes, mode_means, mode_stds, total_size):
     for number, mode_size in enumerate(mode_sizes):
         frequency_density += (mode_size / total_size) * norm.pdf(np.log10(d), np.log10(mode_means[number]), mode_stds[number])
     
+    if d > truncate: # truncates the fequency density function
+        frequency_density = 0
+    
     return frequency_density
 
 
 
-def plot_size(dp, param, param_name, log=True):
+def plot_size(dp, param, param_name, log=True, dpi=600):
     
     """ Plots a parameter agianst particle size when both given as arrays """
 
-    plt.plot(dp, param)
+    plt.figure(dpi=dpi)
+    plt.plot(dp, param, color='black')
+    # plt.ylim([-100, 250])
+    # plt.xlim([0.01, 4])
     
-    plt.xlabel('Particle Size / um')
+    plt.xlabel('$d_p$ / $\mu$m')
     plt.ylabel(str(param_name))
     
     if log == True:
@@ -115,7 +122,18 @@ def calc_charge(d, a, b, c):
     charge = a * d ** b + c
     
     return charge
+
+
+
+def calc_charge_complex(d, a, b):
     
+    """ Calculates the charge on a particle from a quadratic fit ax^2 +bx^-1 given a, b as well as the particle size (in um)"""
+    
+    charge = a * d ** (2) + b * d ** (-1)
+    # charge = a * d ** (2) + b * d ** (- 3 / 2)
+    
+    return charge
+
 
 
 def calc_CD(Re):
@@ -195,7 +213,7 @@ def fall_time(d, drop_height=0.3725, p_p=2000, p_f=1.23, g=9.81, mu=1.79E-5, cfl
 
 
 
-def get_time_fit(dp, drop_height=0.3725, p_p=2000, p_f=1.23, g=9.81, mu=1.79E-5, cfl=1.0, adjust_min_tp=1, trace_time=10):
+def get_time_fit(dp, drop_height=0.3725, p_p=2000, p_f=1.23, g=9.81, mu=1.79E-5, cfl=1.0, adjust_min_tp=1, trace_time=10, convert_time=['N', 6.704, 0.586]):
     
     """
     With help of the fall_time function calculates the numpy time array for particles that fall within the trace time
@@ -203,8 +221,16 @@ def get_time_fit(dp, drop_height=0.3725, p_p=2000, p_f=1.23, g=9.81, mu=1.79E-5,
     """
     
     time_fit = []
+    if convert_time[0] == 'C': # Converting to aerodynamic diameter with constnt
+        da = convert_time[1] * dp
+    elif convert_time[0] == 'E': # Converting to aerodynamic diameter with exponential
+        da = convert_time[2] * dp ** convert_time[3]
+    elif convert_time[0] == 'N': # No conversion
+        da = dp
+    else:
+        raise ValueError('The time_fit[0] option must be none (N), constant (C) or exponential (E), but given: {time_fit[0]}')
     
-    for d in np.flip(dp):
+    for d in np.flip(da):
         
         if d < 20: #arbitary but decreasing cfl at low d helps with numerical stability
             cfl /= 10
@@ -215,7 +241,7 @@ def get_time_fit(dp, drop_height=0.3725, p_p=2000, p_f=1.23, g=9.81, mu=1.79E-5,
         if time_fit[-1] > trace_time:
             break
     
-    while len(time_fit) < len(dp):
+    while len(time_fit) < len(da):
         time_fit = np.append(time_fit, time_fit[-1])
         
     time_fit = np.flip(np.array(time_fit))
@@ -260,79 +286,97 @@ def get_trace(charge_freq_den, time_fit, sample_rate, trace_time):
 
 if __name__ == "__main__":
     
-    dp = np.logspace(np.log10(0.1), np.log10(100000), num=1000, base=10.0) # Evenly logspaced dp to veiw functions
+    dp = np.logspace(np.log10(0.1), np.log10(10000), 1000, base=10) # Evenly logspaced dp to veiw functions
 
     ###########################################################################
     # Size Fit
-    
-    # Size Fit
-    dist_type="trimodal"
-    mode_sizes = 1.120327905, 3.429079214, 8.5692211 # relative sizes of modes
-    mode_means = 0.678318856, 4.487975814, 65.50575473 # means od modes / um
-    mode_stds = 0.188473207, 0.517128972, 0.582954424 # modes standard distributions (logspace)
+    convert_size = True # If True will convert the distribution from a volume distribution to number
+    mode_sizes = [0.12047909541723714, 0.8699151732927874]
+    mode_means = [69.41390100092396, 155.46376875563044]
+    mode_stds = [0.09710018329900653, 0.1262506307566037]
+    truncate = float('inf')
     
     total_size = check_modes(mode_sizes, mode_means, mode_stds)
     frequency_density = []
     
     for d in dp:
-        frequency_density.append(calc_size_freq(d, mode_sizes, mode_means, mode_stds, total_size))
-    
+        frequency_density.append(calc_size_freq(d, mode_sizes, mode_means, mode_stds, total_size, truncate))
     frequency_density = np.array(frequency_density)
-    # plot_size(dp, frequency_density, "Frequency Density", log=True)
+    
+    if convert_size:
+        vp = np.pi * np.power(np.array(dp), 3) / 6 # Volumes at given sizes
+        frequency_density = frequency_density / vp # Converting volume distribution to number
+        frequency_density /= trap_int(np.log10(np.array(dp)), frequency_density) # Normalisation
+    
+    plot_size(dp, frequency_density, "Frequency Density / %", log=True)
     
     ###########################################################################
     # Charge Fit
-
-    a, b, c = 0.0000422872092695638, 1.92919997077313, -2.71413437499992
     
     charge_fit = []
+    fit_type = 'complex' # Simple or complex depending on the shape of the output
     
-    for d in dp:
-        charge_fit.append(calc_charge(d, a, b, c))
-    
+    if fit_type == 'simple':
+        a, b, c = 1.152458766476909e-05, 1.7755435802060726, -11.110956803910822
+        for d in dp:
+            charge_fit.append(calc_charge(d, a, b, c))
+            
+    elif fit_type == 'complex':
+        a, b = 0.001736898030812294, -1285.9991540916203
+        for d in dp:
+            charge_fit.append(calc_charge_complex(d, a, b))
+            
+    else:
+        raise ValueError(f'fit_type should be "Simple" or "complex", instead: {fit_type}')
+
     charge_fit = np.array(charge_fit)
     # plot_size(dp, charge_fit, "Charge / 4$\pi p_{H0}\lambda^2$e",  log=False)
     
     ###########################################################################
     # Charge Frequency Density Fit
     
-    precharge_ratio = 10 # Ratio of total pre-charging to self-charging
+    precharge_ratio = 1 # Ratio of total pre-charging to self-charging
+    charge_multiplier = 1 # Multiplies the entire fit, including both pre- and self-charging
     
     charge_freq_den = frequency_density * charge_fit
     pre_charge_freq_den = frequency_density * (dp / 100) ** 2 # Prechareg scaling with SA
-    self_integral = trap_int(np.arange(len(dp)), charge_freq_den, 0, len(dp))
-    pre_integral = trap_int(np.arange(len(dp)), pre_charge_freq_den, 0, len(dp))
+    neg_self_integral, pos_self_integral = integration_check(dp, charge_freq_den, v=False)
+    self_integral = np.abs(neg_self_integral) + np.abs(pos_self_integral)
+    pre_integral = trap_int(np.log10(dp), pre_charge_freq_den, np.min(np.log10(dp)), np.max(np.log10(dp)))
     pre_charge_freq_den *= precharge_ratio * self_integral / pre_integral
 
-    # integration_check(dp, charge_freq_den)
-    # plot_size(dp, charge_freq_den, "Charge Frequency Density / a.u.",  log=True)
-    # plot_size(dp, pre_charge_freq_den, "Charge Frequency Density / a.u.",  log=True)
+    integration_check(dp, charge_freq_den, v=True)
+    plot_size(dp, charge_freq_den, "Charge Frequency Density / a.u.",  log=True)
+    plot_size(dp, pre_charge_freq_den, "Charge Frequency Density / a.u.",  log=True)
     
     ###########################################################################
     # Drop Time Fit
     
     drop_height = 0.3725 # Height of particle drop / m
     g = 9.81 # Acceleration due to gravity in m s^-2
-    p_p, p_f = 2000, 1.23 # Density of particle and fluid in kg m^-3 (around 2000 for ash and 8940 for Cu)
+    p_p, p_f = 2670, 1.225 # Density of particle and fluid in kg m^-3 (around 1500 for ash, 2670 for Laradorite, 8940 for Cu, and 1290 for MGS-1)
     mu = 1.79E-5 # Viscosity of the fluid (air) in Pa s
     cfl = 1.0 # Taget CFL, ajust if numerical instabilities are encountered
-    trace_time = 5.8 # The time the trace is recorded for, allows the small particles where there is numerical instability to be cut off
-    adjust_min_t = 1 # Parameter can be used to change the minimum timestep (default = 1)
-
-    time_fit = get_time_fit(dp, drop_height, p_p, p_f, g, mu, cfl, adjust_min_t, trace_time)
-    # plot_size(dp, time_fit, "Time / s",  log=True)
+    trace_time = 10 # The time the trace is recorded for, allows the small particles where there is numerical instability to be cut off
+    adjust_min_t = 0.1 # Parameter can be used to change the minimum timestep (default = 1)
+    convert_time = ['N', 0.8, 6.704, 0.586] # [convert?, alpha, beta] First option none (N), constant (C) or exponential (E) for whether to convert the distribution and the fitting paramters if so
+    
+    time_fit = get_time_fit(dp, drop_height, p_p, p_f, g, mu, cfl, adjust_min_t, trace_time, convert_time)
+    
+    plot_size(dp, time_fit, "Time / s",  log=True)
 
     ###########################################################################
     # Trace
 
-    sample_rate = 10.0 # Sapmle rate in Hz
-    charge_multiplier = 1.1 # Multiplies the entire fit, including both pre- and self-charging
+    sample_rate = 100.0 # Sapmle rate in Hz
     
     times, self_trace = get_trace(charge_freq_den, time_fit, sample_rate, trace_time)
     times, pre_trace = get_trace(pre_charge_freq_den, time_fit, sample_rate, trace_time)
     self_trace *= charge_multiplier
     pre_trace *= charge_multiplier
     total_trace = self_trace + pre_trace
+    
+    plt.figure(dpi=600)
 
     plt.plot(times, self_trace, label='self-charging')
     plt.plot(times, pre_trace, label='pre-charging')
