@@ -18,6 +18,7 @@ import json
 from scipy.signal import find_peaks, peak_prominences
 import numpy as np
 import re
+import random
 
     
 
@@ -107,6 +108,20 @@ def custom_sort(file_names):
 
 
 
+def bootstrap_statistic(data, num_samples=1000, stat_func=stats.mean):
+    
+    """Generate bootstrap samples and calculate the statistic for each sample."""
+    
+    boot_samples = []
+    
+    for _ in range(num_samples):
+        resample = [random.choice(data) for _ in range(len(data))]
+        boot_samples.append(stat_func(resample))
+        
+    return boot_samples
+
+
+
 def average_data(data, times, start_index=0, end_index=None, error_lines=False, av_option='mean'):
     
     """
@@ -120,6 +135,7 @@ def average_data(data, times, start_index=0, end_index=None, error_lines=False, 
     
     valid_data = data[start_index:end_index]
     data_lengths, averaged_data, average_minus_error, average_plus_error = [], [], [], []
+    bootstrap_samples = 1000
     
     for d in valid_data:
         data_lengths.append(len([x for x in d if not m.isnan(x)]))
@@ -133,8 +149,11 @@ def average_data(data, times, start_index=0, end_index=None, error_lines=False, 
             av = stats.mean(n_data)
         elif av_option == 'median':
             av = stats.median(n_data)
+        elif av_option == 'bootstrap':
+            boot_means = bootstrap_statistic(n_data, num_samples=bootstrap_samples, stat_func=stats.mean)
+            av = stats.mean(boot_means)
         else:
-            raise ValueError(f"av_option should be 'mean' or 'median', instead: {av_option}")
+            raise ValueError(f"av_option should be 'mean', 'median', or 'bootstrap', instead: {av_option}")
         averaged_data.append(av)
         
         if error_lines:
@@ -407,7 +426,7 @@ def read_and_convert_data(file_names, target_directory, plot_parameter, ignore_l
                 else:
                     raise ValueError("Invalid plot_parameter, requires charge (Q), voltage (V), or raw volatge(RV)")
                 
-                if adjust_for_decay: # Ajeusting for the decay due to the conductivity of air
+                if adjust_for_decay or file.split("_")[0] == "Grimsvotn": # Adjusting for the decay due to the conductivity of air
                     time = 1 / sample_rate
                     decay = last_d * (1 - np.exp(- time / time_const)) # Standard exponential decay from the last timetep
                     total_offset += decay
@@ -482,7 +501,7 @@ def plot_figure(data, times, time, input_type, plot_parameter, file_names, targe
 
     """ Plots data with many options, for more information see the comments by each option in __main__ """
     
-    color_list = ["r", "g", "b", "c", "m", "y", "darkgoldenrod", "yellowgreen", "indigo", "r", "g", "b"]
+    color_list = ["#1f77b4", "#ff7f0e", "#2ca02c", "c", "m", "y", "darkgoldenrod", "yellowgreen", "indigo", "r", "g", "b"]
     loosely_dashed = (15, 15)
 
     if calibration_args[0] == True:
@@ -640,7 +659,7 @@ def plot_figure(data, times, time, input_type, plot_parameter, file_names, targe
                 plt.legend(frameon=True) # Option: loc="lower left"
                 
             ax = plt.gca()
-            ax.set_xlim([0, time])
+            ax.set_xlim([0, 20])
             left_subplot_ylim = plt.gca().get_ylim() # Extracting the y axis limits
         
         if plot_option == "Both":
@@ -694,20 +713,20 @@ if __name__ == "__main__":
     ignore_len_errors = "Extend" # Should be "Crop" or "Extend" if you want to shorten data to shortest series or extend to the longest "Error" returns error. Note: if "Crop" selected this will affect teh data plotted in the boxplot too
     file_names_lis = ['Lab2Small_1.txt', 'Lab2Small_2.txt', 'Lab2Small_3.txt', 'Lab2Small_4.txt']
     file_names_lol = [['Calibration_1.txt']]
-    remove_files = ['Airport_3.txt', '63-75_1.txt', '63-75_4.txt', '63-125_4.txt', '63-125_5.txt', '63-80_2.txt', 'Atitlan_3.txt']
+    remove_files = ['Airport_3.txt', '63-75_1.txt', '63-75_4.txt', '63-125_4.txt', '63-125_5.txt', '63-80_2.txt', 'Atitlan_3.txt', 'StHelens_1.txt', 'StHelens_3.txt', 'Eiya_1.txt']
     lol_labels = ["Control", "Zerostat", "Rested"]
-    spec_cat = [] # specify categories to include if input type is categorised (file names before the underscore), leave empty to include all
+    spec_cat = ['Atitlan', 'Grimsvotn'] # specify categories to include if input type is categorised (file names before the underscore), leave empty to include all
     # '63-125', '63-75', '75-125', '80-125', '63-80'
     
     trim = True # If True removes the begining of the trace such that all traces start at the same time (required to calulate average trace)
     plot_average = True # If True plots the average trace instead of all individual traces
-    av_option = 'mean' # How the average is calculated, should be 'mean' or 'median'
+    av_option = 'mean' # How the average is calculated, should be 'mean', 'median', or 'bootstrap,
     label_sep_runs = True # If input_type = "cat" and plot_average = False, this will make the runs different hues and labelled, not availible in simulatneous
-    error_lines = 'N' # Shows the error when averaged, should be area (A), line (L), or none (N)
+    error_lines = 'A' # Shows the error when averaged, should be area (A), line (L), or none (N)
     manual_trim = {'Lab2Small_1.txt':4.1, 'Lab2Small_2.txt':3.25, 'Lab2Small_3.txt':2, 'Lab2Small_4.txt':3.7} # Dictionary of file names and the time (in seconds) that you want to maually trim from the start
     store_dict, read_dict = False, True # Options to store or read from file the manual trim dictionary
     Show_T_RH = False # Weather or not to show Temperature and humidity on the plot (if multiple traces plotted than it is an average)
-    adjust_by_mass = False
+    adjust_by_mass = True
     adjust_for_decay, time_const = False, 310.5 # in [s] and comes from the conductivity of air
     base_time, tolerance_amp, tolerance_len = 0.5, 1.5, 300 # Number of seconds to use as the baseline, How many times greater the trace needs to be than baseline noise to register start over how many steps
     
