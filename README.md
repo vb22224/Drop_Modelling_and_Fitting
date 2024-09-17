@@ -1,7 +1,16 @@
 
 # Drop_Modelling_and_Fitting
 
- Scripts to both plot data from triboelectric charge experiments (Drop_Plotter.py) and model the dicretised trace expected (Drop_Trace_Model.py) to be seen by a Faraday cup to estimate the extent of experimental particle precharging and selfcharging.
+ Scripts to plot data from triboelectric charge experiments and estimate the extent of experimental particle precharging and selfcharging. The data used for these plots is avalible at https://www.doi.org/10.18126/n3dx-dh16.
 
-These are then adapted to form a continous trace in the Continous_Trace_Model.py, which can be fit by hand in the Continuos_Fitter.py and automatically with the Automated_Fitter.py.
+ A summary of the codes' functionalities are as follows:
+Drop_Plotter.py - Plots the Fararday cup triboelectricity measurements.
+Drop_Trace_Model.py - Calculates the time taken for paticles to fall to the Faraday cup.
+Continuous_Trace_Model.py - Calculates the expected Fararday cup trace and components given size and charge distributions.
+Continuous_Fitter.py - Lets the expected Fararday cup trace be fit manually to the measured trace.
+Automated_Fitter.py - Automatically fits the expected Fararday cup trace to that measured experimentally given an initial guess.
+Camsizer_Plotter.py - Plots and fits the size distributions for data from the CAMSIZER X2.
+Mastersizer_Plotter.py - Plots and fits the size distributions for data from the Mastersizer 3000.
+Ring_Fitter.py - Fits traces for ring charge sensors rather than Farday cups
+
 
