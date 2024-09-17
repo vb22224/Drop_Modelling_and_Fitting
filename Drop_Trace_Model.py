@@ -407,7 +407,7 @@ if __name__ == "__main__":
     charge_array = array_charge_fit(size_array, a, b, a_scatt=0.0002, b_scatt=0.3) # Typical vaues: a_scatt=0.0002, b_scatt=0.3
     charge_array = normalise_charge(charge_array, size_array)
     
-    # plot_vs_size(size_array, time_array, "Time / s")
+    plot_vs_size(size_array, time_array, "Time / s")
     # plot_time_hist(time_array)
     # plot_vs_size(size_array, charge_array, "Charge / 4$\pi p_{H0}\lambda^2$e")
     # plot_speed_hist(array_drop_time(size_array, target_cfl=target_cfl, drop_height=drop_height, p_p=p_p, value='speed')) # Plots a histogram of the particles end velocities

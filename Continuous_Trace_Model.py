@@ -98,18 +98,20 @@ def plot_size(dp, param, param_name, log=True, dpi=600):
     
     """ Plots a parameter agianst particle size when both given as arrays """
 
-    plt.figure(dpi=dpi)
-    plt.plot(dp, param, color='black')
-    # plt.ylim([-100, 250])
-    # plt.xlim([0.01, 4])
+    fig, ax = plt.figure(dpi=dpi), plt.gca()
+    ax.plot(dp, param, color='black')
+    # ax.set_ylim([-100, 250])
+    # ax.set_xlim([0.1, 10000])
     
-    plt.xlabel('$d_p$ / $\mu$m')
-    plt.ylabel(str(param_name))
+    # plt.plot([0.1, 10000], [0, 0], '--', color='black', lw='1.0')
     
-    if log == True:
-        plt.xscale('log')
+    ax.set_xlabel('$d_p$ / $\mu$m')
+    ax.set_ylabel(str(param_name))
     
-    plt.gca().xaxis.set_major_formatter(ScalarFormatter())
+    if log:
+        ax.set_xscale('log')
+    
+    ax.xaxis.set_major_formatter(ScalarFormatter())
     
     plt.show()
     
@@ -291,9 +293,9 @@ if __name__ == "__main__":
     ###########################################################################
     # Size Fit
     convert_size = True # If True will convert the distribution from a volume distribution to number
-    mode_sizes = [0.12047909541723714, 0.8699151732927874]
-    mode_means = [69.41390100092396, 155.46376875563044]
-    mode_stds = [0.09710018329900653, 0.1262506307566037]
+    mode_sizes = [0.2702522105709556, 0.5377299225945315, 0.14637881818382076]
+    mode_means = [47.68674473289051, 129.87119736614284, 600.1805862890564]
+    mode_stds = [0.16414445691995336, 0.1917548803130691, 0.37970119431980565]
     truncate = float('inf')
     
     total_size = check_modes(mode_sizes, mode_means, mode_stds)
@@ -322,7 +324,7 @@ if __name__ == "__main__":
             charge_fit.append(calc_charge(d, a, b, c))
             
     elif fit_type == 'complex':
-        a, b = 0.001736898030812294, -1285.9991540916203
+        a, b = 0.010213607341602917, -728.2377396100616
         for d in dp:
             charge_fit.append(calc_charge_complex(d, a, b))
             
@@ -354,7 +356,7 @@ if __name__ == "__main__":
     
     drop_height = 0.3725 # Height of particle drop / m
     g = 9.81 # Acceleration due to gravity in m s^-2
-    p_p, p_f = 2670, 1.225 # Density of particle and fluid in kg m^-3 (around 1500 for ash, 2670 for Laradorite, 8940 for Cu, and 1290 for MGS-1)
+    p_p, p_f = 2721.158, 1.225 # Density of particle and fluid in kg m^-3 (around 1500 for ash, 2670 for Laradorite, 8940 for Cu, and 1290 for MGS-1)
     mu = 1.79E-5 # Viscosity of the fluid (air) in Pa s
     cfl = 1.0 # Taget CFL, ajust if numerical instabilities are encountered
     trace_time = 10 # The time the trace is recorded for, allows the small particles where there is numerical instability to be cut off

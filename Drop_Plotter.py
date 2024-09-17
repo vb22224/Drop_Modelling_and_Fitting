@@ -122,7 +122,7 @@ def bootstrap_statistic(data, num_samples=1000, stat_func=stats.mean):
 
 
 
-def average_data(data, times, start_index=0, end_index=None, error_lines=False, av_option='mean'):
+def average_data(data, times, start_index=0, end_index=None, error_lines=False, av_option='mean', drop_stats=False):
     
     """
     Averages data from the data list of traces in specified range satrt_index to end_index
@@ -140,6 +140,13 @@ def average_data(data, times, start_index=0, end_index=None, error_lines=False, 
     for d in valid_data:
         data_lengths.append(len([x for x in d if not m.isnan(x)]))
     
+    if drop_stats: # Gets errors on the charge drops
+        diff_lis = []
+        for i, vd in enumerate(valid_data):
+            diff = vd[data_lengths[i]-1] - vd[0]
+            diff_lis.append(diff)
+        print(f'Mean drop: {np.mean(diff_lis)}, std dev: {np.std(diff_lis)}, N: {len(diff_lis)}')
+
     for n in range(min(data_lengths)):
         n_data = []
         for d in valid_data:
@@ -497,7 +504,7 @@ def read_and_convert_data(file_names, target_directory, plot_parameter, ignore_l
 
 def plot_figure(data, times, time, input_type, plot_parameter, file_names, target_directory, lol_structure, lol_labels, change_type, plot_option,
                 temperatures=[], humidities=[], plot_average=True, show=True, get_av_data=False, Show_T_RH=False, simultaneous=False, error_lines='N',
-                get_error=False, calibration_args=[False], adjust_by_mass=False, av_option='mean', label_sep_runs=False, dpi=200):
+                get_error=False, calibration_args=[False], adjust_by_mass=False, av_option='mean', label_sep_runs=False, drop_stats=False, dpi=200):
 
     """ Plots data with many options, for more information see the comments by each option in __main__ """
     
@@ -614,10 +621,11 @@ def plot_figure(data, times, time, input_type, plot_parameter, file_names, targe
                     if plot_average:
                         start_index = sum(lol_structure[:counter])
                         end_index = start_index + lol_structure[counter]
-                        averaged_data, av_times, average_minus_error, average_plus_error = average_data(data, times, start_index, end_index, error_lines=error_lines, av_option=av_option)
+                        averaged_data, av_times, average_minus_error, average_plus_error = average_data(data, times, start_index, end_index, error_lines=error_lines, av_option=av_option, drop_stats=drop_stats)
                         if show:
                             plt.plot(av_times, averaged_data, '-', linewidth=1.0, label=lol_labels[counter], color=color_list[counter])
-                            # print(f'{lol_labels[counter]} -> first: {averaged_data[0]}, last: {averaged_data[-1]}') # Printing the beginning and end of each averaged trace
+                            if drop_stats:
+                                print(f'{lol_labels[counter]} -> first: {averaged_data[0]}, last: {averaged_data[-1]}') # Printing the beginning and end of each averaged trace
                             if error_lines == 'A':
                                 plt.fill_between(av_times, average_minus_error, average_plus_error, color=color_list[counter], alpha=0.3)
                             elif error_lines == 'L':
@@ -659,7 +667,7 @@ def plot_figure(data, times, time, input_type, plot_parameter, file_names, targe
                 plt.legend(frameon=True) # Option: loc="lower left"
                 
             ax = plt.gca()
-            ax.set_xlim([0, 20])
+            # ax.set_xlim([0, 20])
             left_subplot_ylim = plt.gca().get_ylim() # Extracting the y axis limits
         
         if plot_option == "Both":
@@ -704,7 +712,7 @@ def plot_figure(data, times, time, input_type, plot_parameter, file_names, targe
 
 if __name__ == "__main__":
     
-    path = "..\\Drops\\Volcano_Final"
+    path = "..\\Drops\\Labradorite_sizes"
     input_type = "cat" # Directory (dir), categorised (cat), list (lis), or list of lists (lol)
     # Note: the categroised (cat) input type requires filenames formatted such that the type is follwed by underscore then index e.g. Atitlan_1.txt 
     plot_parameter = "Q" # Charge (Q), voltage (V), or raw volatge (RV)
@@ -715,7 +723,7 @@ if __name__ == "__main__":
     file_names_lol = [['Calibration_1.txt']]
     remove_files = ['Airport_3.txt', '63-75_1.txt', '63-75_4.txt', '63-125_4.txt', '63-125_5.txt', '63-80_2.txt', 'Atitlan_3.txt', 'StHelens_1.txt', 'StHelens_3.txt', 'Eiya_1.txt']
     lol_labels = ["Control", "Zerostat", "Rested"]
-    spec_cat = ['Atitlan', 'Grimsvotn'] # specify categories to include if input type is categorised (file names before the underscore), leave empty to include all
+    spec_cat = [] # specify categories to include if input type is categorised (file names before the underscore), leave empty to include all
     # '63-125', '63-75', '75-125', '80-125', '63-80'
     
     trim = True # If True removes the begining of the trace such that all traces start at the same time (required to calulate average trace)
@@ -725,7 +733,8 @@ if __name__ == "__main__":
     error_lines = 'A' # Shows the error when averaged, should be area (A), line (L), or none (N)
     manual_trim = {'Lab2Small_1.txt':4.1, 'Lab2Small_2.txt':3.25, 'Lab2Small_3.txt':2, 'Lab2Small_4.txt':3.7} # Dictionary of file names and the time (in seconds) that you want to maually trim from the start
     store_dict, read_dict = False, True # Options to store or read from file the manual trim dictionary
-    Show_T_RH = False # Weather or not to show Temperature and humidity on the plot (if multiple traces plotted than it is an average)
+    Show_T_RH = True # Weather or not to show Temperature and humidity on the plot (if multiple traces plotted than it is an average)
+    drop_stats = True # Whether to print stats about the average drops
     adjust_by_mass = True
     adjust_for_decay, time_const = False, 310.5 # in [s] and comes from the conductivity of air
     base_time, tolerance_amp, tolerance_len = 0.5, 1.5, 300 # Number of seconds to use as the baseline, How many times greater the trace needs to be than baseline noise to register start over how many steps
@@ -746,7 +755,7 @@ if __name__ == "__main__":
         file_names, lol_structure, lol_labels = get_file_names(input_type, path, file_names_lis, file_names_lol, remove_files, lol_labels, spec_cat=spec_cat)
         data, sample_rates, temperatures, humidities, filtered_names = read_and_convert_data(file_names, path, plot_parameter, ignore_len_errors, base_time, tolerance_amp, tolerance_len, trim, manual_trim, store_dict, read_dict, data_col, adjust_by_mass=adjust_by_mass, adjust_for_decay=adjust_for_decay, time_const=time_const)
         time_step, times, time = get_times(sample_rates, data)
-        plot_figure(data, times, time, input_type, plot_parameter, filtered_names, path, lol_structure, lol_labels, change_type, plot_option, temperatures, humidities, plot_average=plot_average, Show_T_RH=Show_T_RH, error_lines=error_lines, adjust_by_mass=adjust_by_mass, av_option=av_option, label_sep_runs=label_sep_runs, dpi=dpi)
+        plot_figure(data, times, time, input_type, plot_parameter, filtered_names, path, lol_structure, lol_labels, change_type, plot_option, temperatures, humidities, plot_average=plot_average, Show_T_RH=Show_T_RH, error_lines=error_lines, adjust_by_mass=adjust_by_mass, av_option=av_option, label_sep_runs=label_sep_runs, drop_stats=drop_stats, dpi=dpi)
         
     
     ###########################################################################
