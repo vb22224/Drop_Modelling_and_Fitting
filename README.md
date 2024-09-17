@@ -1,6 +1,8 @@
 
 # Drop_Modelling_and_Fitting
 
+[![DOI](https://zenodo.org/badge/722522834.svg)](https://zenodo.org/doi/10.5281/zenodo.13774132)
+
  Scripts to plot data from triboelectric charge experiments and estimate the extent of experimental particle precharging and selfcharging. The data used for these plots is avalible at https://www.doi.org/10.18126/n3dx-dh16.
 
  A summary of the codes' functionalities are as follows:
